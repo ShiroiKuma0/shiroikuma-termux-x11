@@ -22,7 +22,7 @@ import java.security.MessageDigest
 def pkgName = 'termux-x11-nightly'
 def pkgVersion = (file("$rootDir/lorie/version.gradle").text =~ /version = "([^"]+)"/)[0][1] + '-0'
 def pkgDescription = 'Companion package for termux-x11 app'
-def pkgHomepage = 'https://github.com/termux/termux-x11'
+def pkgHomepage = 'https://github.com/ShiroiKuma0/shiroikuma-termux-x11'
 def pkgMaintainer = 'Twaik Yont @twaik'
 def pkgDepends = 'xkeyboard-config'
 
