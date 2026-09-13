@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- shiroikuma-termux-x11 fork (Phase 4): the 白い熊 Termux X11 UI page.
+     PreferenceCategory = section header (36 dp, text-wide underline; a 1 px hairline above every one
+     but the first); rows sit at indent 1 (72 dp). ShiroikumaUiFragment wires every row by key.
+     Everything here is persistent="false": the rows read and write their own device-local files
+     (ShiroikumaExport.EXIMPORT_PREFS, AutomationAuth.PREFS_FILE) through code, never the default
+     SharedPreferences the app's own settings live in. -->
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <PreferenceCategory
+        android:title="@string/shiroikuma_ui_section_eim"
+        android:layout="@layout/preference_category_shiroikuma_first"
+        app:iconSpaceReserved="false">
+        <Preference
+            android:key="shiroikuma_eim_entry"
+            android:title="@string/shiroikuma_eim_entry"
+            android:summary="@string/shiroikuma_eim_entry_desc"
+            android:layout="@layout/preference_shiroikuma_indent1"
+            android:persistent="false"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:key="shiroikuma_eim_dir"
+            android:title="@string/shiroikuma_eim_dir"
+            android:layout="@layout/preference_shiroikuma_indent1"
+            android:persistent="false"
+            app:iconSpaceReserved="false" />
+        <Preference
+            android:key="shiroikuma_eim_last"
+            android:title="@string/shiroikuma_eim_last"
+            android:layout="@layout/preference_shiroikuma_indent1"
+            android:persistent="false"
+            android:selectable="false"
+            app:iconSpaceReserved="false" />
+        <!-- 保存復元 automation contract v2 (§2): the master switch (default ON) gates the exported
+             StateExportReceiver and the AutomationProvider data door; 「Use authorization token?」
+             (default OFF) decides whether a caller must also present the token; the token row is
+             shown only while it is being asked for. All three live in AutomationAuth's own
+             device-local prefs file and never travel inside an export. -->
+        <SwitchPreferenceCompat
+            android:key="shiroikuma_auto_enabled"
+            android:title="@string/shiroikuma_auto_switch"
+            android:summary="@string/shiroikuma_auto_switch_desc"
+            android:layout="@layout/preference_shiroikuma_indent1"
+            android:persistent="false"
+            app:iconSpaceReserved="false" />
+        <SwitchPreferenceCompat
+            android:key="shiroikuma_auto_require_token"
+            android:title="@string/shiroikuma_auto_require_token"
+            android:summary="@string/shiroikuma_auto_require_token_desc"
+            android:layout="@layout/preference_shiroikuma_indent1"
+            android:persistent="false"
+            app:iconSpaceReserved="false" />
+        <com.termux.x11.shiroikuma.AutomationTokenPreference
+            android:key="shiroikuma_auto_token"
+            android:title="@string/shiroikuma_auto_token"
+            android:summary="@string/shiroikuma_auto_token_desc"
+            android:layout="@layout/preference_shiroikuma_indent1"
+            android:widgetLayout="@layout/preference_widget_shiroikuma_regenerate"
+            android:persistent="false"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:title="@string/shiroikuma_ui_section_reset"
+        android:layout="@layout/preference_category_shiroikuma"
+        app:iconSpaceReserved="false">
+        <Preference
+            android:key="shiroikuma_ui_reset"
+            android:title="@string/shiroikuma_ui_reset"
+            android:summary="@string/shiroikuma_ui_reset_desc"
+            android:layout="@layout/preference_shiroikuma_indent1"
+            android:persistent="false"
+            app:iconSpaceReserved="false" />
+    </PreferenceCategory>
+
+</PreferenceScreen>

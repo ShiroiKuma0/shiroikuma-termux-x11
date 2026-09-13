@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- shiroikuma fork: the automation data door's dataSync foreground service (contract v2 §4). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
 
     <application
         android:name=".TermuxX11Application"
@@ -76,8 +78,56 @@
                 <action android:name="com.termux.x11.ACTION_CUSTOM" />
             </intent-filter>
         </receiver>
+
+        <!-- ==== shiroikuma fork (Phase 4): the 白い熊 Termux X11 UI page + the 保存復元 automation
+             contract v2. Every component below is ALSO listed in lorie-app/src/sharedUid/AndroidManifest.xml,
+             which puts it in Termux's process like the rest of the app. ==== -->
+        <activity
+            android:name=".shiroikuma.ShiroikumaUiActivity"
+            android:label="@string/shiroikuma_ui_title"
+            android:theme="@style/ShiroikumaUiTheme"
+            android:taskAffinity=".LoriePreferences"
+            android:excludeFromRecents="true"
+            android:supportsPictureInPicture="false"
+            android:resizeableActivity="true"
+            android:exported="true" />
+
+        <!-- §1: headless export for the batch. No android:permission (the caller cannot hold one) —
+             this receiver only ever writes where it was told to; AutomationAuth is the gate. -->
+        <receiver
+            android:name=".shiroikuma.automation.StateExportReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver">
+            <intent-filter>
+                <action android:name="com.termux.x11.action.EXPORT_STATE" />
+                <action android:name="com.termux.x11.action.LIST_CATEGORIES" />
+                <action android:name="com.termux.x11.action.CANCEL_EXPORT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- §2a: the data door. Exported with no permission, deliberately — AutomationCallers checks
+             an EXACT package name, the kernel's uid and a pinned signing certificate instead. -->
+        <provider
+            android:name=".shiroikuma.automation.AutomationProvider"
+            android:authorities="com.termux.x11.automation"
+            android:exported="true"
+            tools:ignore="ExportedContentProvider" />
+
+        <service
+            android:name=".shiroikuma.automation.AutomationDataService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Capability discovery, readable WITHOUT waking this app (a frozen app cannot be asked). -->
+        <meta-data android:name="shiroikuma.automation.contract" android:value="2" />
+        <meta-data android:name="shiroikuma.automation.format" android:value="1" />
+        <meta-data android:name="shiroikuma.automation.min_format" android:value="1" />
     </application>
     <queries>
         <package android:name="com.termux" />
+        <!-- shiroikuma fork (contract v2 §2a): the automation callers. Without these the reply
+             broadcast's setPackage() fails SILENTLY on Android 11+. -->
+        <package android:name="shiroikuma.oyokanri" />
+        <package android:name="shiroikuma.jiyusagyoban" />
     </queries>
 </manifest>
