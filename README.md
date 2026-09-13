@@ -1,20 +1,136 @@
+<div align="center">
+
+<img src="lorie/src/main/ic_launcher-web.png" width="120" alt="白い熊 Termux X11 icon" />
+
 # 白い熊 Termux X11
 
-白い熊's fork of [Termux:X11](https://github.com/termux/termux-x11) (`termux/termux-x11`), the
-Termux X server add-on. Same app id **`com.termux.x11`** (it installs *over* upstream's app, never
-beside it), the `sharedUid` flavour only, signed with the key shared by the whole 白い熊 `com.termux`
-family, and tracking upstream's `master` tip commit by commit.
+**The Termux X server add-on — an X window that never throttles your shell, with one-zip backups a sister app can run for you.**
 
-What changes: the name (**白い熊 Termux X11**), the icon and the links point at this fork; the build
-is a signed release APK plus the companion `termux-x11-nightly` `.deb` whose loader accepts this
-fork's signature. Everything else is upstream's — the README below is theirs.
+A fork of [Termux:X11](https://github.com/termux/termux-x11) (`termux/termux-x11`) with **major additions**: the `sharedUid` flavour as the only shipped shape (the X window lives in Termux's own process, so Termux is never background-throttled while a graphical app is in front), the **白い熊 Termux X11 UI** page (long-press the gear extra key), **Export / Import** of every preference to a single `.zip`, the sister-app **backup-automation contract v2** so 保存復元 can back the app up unattended, a **matching companion `termux-x11-nightly` package** whose loader accepts this fork's signature, the black/yellow traced launcher icon, and a version string pinned to the exact upstream commit each build sits on.
 
-Builds: [releases](https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases) — install the
-`…_sharedUid.apk`, then in Termux `dpkg -i` the matching `…_termux-x11-nightly.deb` and
-`apt-mark hold termux-x11-nightly` (upstream's package from packages.termux.dev refuses this
-fork's signature).
+Installs **over** the stock Termux:X11 (app id `com.termux.x11` kept so the Termux package ecosystem keeps working); the whole family — Termux, Termux API, Termux X11, Termux GUI and 白い熊 GNU Emacs — shares Android UID `com.termux` and is signed with one key, so every member must come from these forks.
+
+**📥 Latest release: [`1.03.01+2026-09-10.23-47.g53f84373+002`](https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases/latest)** — [all releases & downloads »](https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases) · [changelog »](CHANGELOG.md)
+
+</div>
 
 ---
+
+## 🪟 An X window that never throttles Termux
+
+Upstream's nightly ships both of its flavours as debug builds, `standalone` first; this fork builds and ships **only the `sharedUid` flavour, as a signed release build**: `sharedUserId="com.termux"` and `android:process="com.termux"` on every component, so the X server activity, the preferences screen and every broadcast receiver run *inside Termux's process*. The practical difference is the one you feel every day — when the X window is in front, Android sees **Termux itself** as the foreground app, and your shell, your compiler and your X clients never fall into the background cpuset while you look at their output. Because the entire `com.termux` family is signed with one key, the shared UID matches Termux's by construction.
+
+---
+
+## 🐻 The 白い熊 Termux X11 UI page
+
+One black-and-yellow page in the house look — section headings underlined in `#FFFF00`, 72 dp rows, pill buttons, bordered black dialogs — holding everything this fork adds. It is never more than one gesture away:
+
+- **long-press the gear key** (PREFERENCES) on the extra-keys bar — a generic long-press hook added to `ExtraKeysView` that upstream's keys did not have;
+- **long-press the Preferences button** on the not-connected screen;
+- the **launcher shortcut** `白い熊 Termux X11 UI` (long-press the app icon);
+- the **first row** of upstream's Preferences screen.
+
+The page carries the Export / Import section (with the automation rows inside it) and a Reset row that clears only the page's own preferences file. The preferences screen's *version* row shows the fork version string, so you always know which upstream commit you are running.
+
+---
+
+## 📦 Export / Import — every preference in one `.zip`
+
+「Export / Import…」 opens the family's panel: a bordered box with a red/yellow export-directory field (a SAF folder, chosen once), the last-export line, 全選択 + category checkboxes, and the pill row Cancel ‖ Import Export. An export writes `shiroikuma-termux-x11_<yyyy-MM-dd_HH-mm-ss>.zip` — `manifest.json` plus a type-tagged `settings.json` of every SharedPreferences file (display, pointer, keyboard, extra keys, the secondary-display copy) — as a `.part` file renamed only when complete. Import is a per-key merge, committed synchronously, restricted to the categories the archive carries; it ends with 「Later」 / 「Restart now」, and *Restart now* relaunches the X window alone — never `Runtime.exit`, because in the `sharedUid` flavour that would kill every Termux session. The export directory and the automation switch are device-local and never travel inside a backup.
+
+---
+
+## 🤖 Backed up unattended by 保存復元
+
+The fork implements the sister-app **backup-automation contract v2**, so one 自由作業盤 task can back up every 白い熊 app in a batch and 応用管理 can restore them onto a clean phone:
+
+- a headless **`EXPORT_STATE` / `LIST_CATEGORIES` / `CANCEL_EXPORT`** receiver that writes the same `.zip` the panel does and answers with exactly one reply broadcast (`FLAG_INCLUDE_STOPPED_PACKAGES`, no binders — the shape proven on EMUI);
+- the **`com.termux.x11.automation` data door** — a content provider with `describe` / `export` / `import` / `cancel`, which identifies its caller by exact package name, kernel uid *and* pinned signing certificate before it moves a byte through the caller's descriptor, backed by a `dataSync` foreground service;
+- **progress broadcasts** with a 500 ms throttle and a 20 s heartbeat;
+- the rows on the UI page: 「Automation export」 (ON by default), 「Use authorization token?」 (OFF) and the token row with a Regenerate pill, all `commit()`ed so a force-stop never loses a switch.
+
+---
+
+## 📀 The matching companion package
+
+The `termux-x11` command in the Termux prefix is a loader that verifies the **signing certificate** of the installed app before it will load it. The stock `termux-x11-nightly` package from `packages.termux.dev` is built against upstream's test key and prints *“Signature verification of target application com.termux.x11 failed”* with this app. Every release therefore ships **two artefacts at one version**: the signed `…_sharedUid.apk` and a `…_termux-x11-nightly.deb` whose loader carries the family certificate. Its internal Debian version stays upstream's `1.03.01-0`, so it replaces the stock package in place — see *Installing* below.
+
+---
+
+## ⚫🟡 The traced icon, and our name everywhere
+
+The launcher art is a black/yellow line tracing — the chevron, the X box with its orbit, the underscore — generated from `design/shiroikuma-termux-x11-icon.svg` by `tools/icon/emit_launcher.py` into upstream's own file names (adaptive background / foreground / monochrome included), so upstream's adaptive-icon wrappers stay untouched. The app is **白い熊 Termux X11** on the launcher, in the notification (channel and title), on the accessibility-service row; the HELP button, the loader's error messages and the `.deb`'s `Homepage:` all point at this repository.
+
+---
+
+## 🔑 One family, one key
+
+Five apps share Android UID `com.termux` — [shiroikuma-termux](https://github.com/ShiroiKuma0/shiroikuma-termux), [shiroikuma-termux-api](https://github.com/ShiroiKuma0/shiroikuma-termux-api), **shiroikuma-termux-x11** (this repo), [shiroikuma-termux-gui](https://github.com/ShiroiKuma0/shiroikuma-termux-gui) and [shiroikuma-emacs](https://github.com/ShiroiKuma0/shiroikuma-emacs) (白い熊 GNU Emacs, `shiroikuma.emacs`, installs side-by-side with the stock `org.gnu.emacs`). A shared UID demands one certificate across all of them, so the Termux-family forks keep upstream's app ids and install *over* the stock apps, and a stock Termux cannot coexist with a fork member. The signed build is reproducible: `keystore.properties` (gitignored) feeds both the release signing config and the debug one the loader derives its certificate check from.
+
+---
+
+## 🔢 A version that names the upstream commit
+
+Termux:X11 has no releases — its `nightly` tag moves with every `master` commit while the literal `1.03.01` stands still for months. This fork rebases `custom` onto every upstream commit and pins the base in the version:
+`<upstream version>+<upstream base date>.<HH-MM>.g<sha8>+<NNN>`, e.g. `1.03.01+2026-09-10.23-47.g53f84373+002` — upstream `53f84373` committed 2026-09-10 23:47 UTC, our second build on it. `versionCode` = upstream code × 10000 + N, and the build counter runs monotonically across syncs so an update is never a downgrade.
+
+---
+
+## Family
+
+- [shiroikuma-termux](https://github.com/ShiroiKuma0/shiroikuma-termux) — 白い熊 Termux (`com.termux`)
+- [shiroikuma-termux-api](https://github.com/ShiroiKuma0/shiroikuma-termux-api) — 白い熊 Termux API (`com.termux.api`)
+- **shiroikuma-termux-x11** — 白い熊 Termux X11 (`com.termux.x11`, this repo)
+- [shiroikuma-termux-gui](https://github.com/ShiroiKuma0/shiroikuma-termux-gui) — 白い熊 Termux GUI (`com.termux.gui`)
+- [shiroikuma-emacs](https://github.com/ShiroiKuma0/shiroikuma-emacs) — 白い熊 GNU Emacs (`shiroikuma.emacs`)
+
+## Built on Termux:X11
+
+A fork of [Termux:X11](https://github.com/termux/termux-x11) (app id `com.termux.x11` kept, so it installs over the official build and the `termux-x11` tooling keeps working). Termux:X11 is a fully fledged X.Org server built with the Android NDK and tuned for Termux — the whole X stack (`xserver`, `libx11`, `pixman`, …) arrives as sixteen git submodules that this fork never patches. The code remains under the [GNU General Public License v3](LICENSE).
+
+## Installing
+
+1. Install `shiroikuma-termux-x11_<version>_sharedUid.apk` from the [releases page](https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases). It upgrades the installed `com.termux.x11` in place (same id, same family key, higher `versionCode`); a *stock* Termux:X11 must be uninstalled first, since its certificate differs.
+2. In Termux, install the matching companion package and hold it, or the next `pkg upgrade` swaps the loader back to the stock one that refuses this app:
+
+   ```sh
+   dpkg -i shiroikuma-termux-x11_<version>_termux-x11-nightly.deb
+   apt-mark hold termux-x11-nightly
+   ```
+
+## Building
+
+The repo uses submodules — clone with them, on the `custom` branch:
+
+```sh
+git clone --recurse-submodules -b custom https://github.com/ShiroiKuma0/shiroikuma-termux-x11
+cd shiroikuma-termux-x11
+git submodule update --init --recursive     # after every checkout that moves a gitlink
+```
+
+Toolchain: JDK **21** (the default `java` may be older — Gradle 9.x refuses it), the Android SDK with `compileSdk 34`, NDK **`29.0.14206865`** exactly (`termuxX11NdkVersion` in `lorie/version.gradle`), CMake ≥ 3.22, `python3`, `bison` and `patch` on `PATH`. Gradle reads the SDK path from a gitignored `local.properties` (`sdk.dir=/path/to/android-sdk`).
+
+Signing: copy `keystore.properties_sample` to `keystore.properties` (gitignored, repo root) and fill in the keystore that signs the whole `com.termux` family — `buildFork` refuses to run without it, because an unsigned APK would neither install over the signed one nor pass the loader's certificate check. The script wires that keystore to **both** `signingConfigs.release` and `signingConfigs.debug`; the latter is what `shell-loader/build.gradle` computes the loader's `BuildConfig.SIGNATURE` from.
+
+```sh
+# Signed sharedUid release APK + companion .deb → ~/tmp, then BUILD_NUMBER is bumped (the shippable build)
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew buildFork --console=plain < /dev/null
+
+# Release APK only (no copy, no bump) — under lorie-app/build/outputs/apk/sharedUid/release/
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew :lorie-app:assembleSharedUidRelease
+
+# Companion package only (.deb + .pkg.tar.xz under shell-loader/build/outputs/companion/)
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew :shell-loader:buildCompanionPackage
+```
+
+`buildFork` = `:lorie-app:assembleSharedUidRelease` (R8 minify + resource shrink, all four ABIs in one universal APK) + `:shell-loader:buildCompanionPackage`; it copies the pair to `~/tmp/` as `shiroikuma-termux-x11_<versionName>_sharedUid.apk` and `shiroikuma-termux-x11_<versionName>_termux-x11-nightly.deb`, then increments `BUILD_NUMBER` in `gradle.properties`. A cold build compiles the X server for four ABIs — tens of minutes on a slow box. Only the `sharedUid` flavour is ever shipped.
+
+---
+
+> **Everything below is upstream's own Termux:X11 manual, kept verbatim** — the setup, the
+> `termux-x11` command, gestures, notification, proot/chroot notes and preferences from the command
+> line all apply unchanged to this fork (read “Termux:X11” as 白い熊 Termux X11).
 
 # Termux:X11
 
