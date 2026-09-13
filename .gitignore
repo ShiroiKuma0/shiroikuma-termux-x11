@@ -39,3 +39,15 @@ github.properties
 
 *.cxx
 app/.cxx/*
+
+### shiroikuma-termux-x11 fork ###
+# Release signing: the credentials and the key itself never enter git. Upstream's tracked
+# throw-away test key is exempted explicitly so the rule never hides it from tooling.
+/keystore.properties
+*.jks
+!/lorie-app/testkey_untrusted.jks
+# (local.properties is already ignored by upstream's rule above.)
+# Agent config is committed (CLAUDE.md, .claude/skills/); only the machine-local settings are not.
+/.claude/settings.local.json
+# Agent working files: generator scripts, intermediate data, throwaway exports.
+/.scratch/

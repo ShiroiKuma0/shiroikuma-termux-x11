@@ -1,0 +1,217 @@
+// --- shiroikuma-termux-x11 fork: version pin, signing, buildFork ---------------------------------
+//
+// Applied by the LAST line of lorie-app/build.gradle (`apply from: 'shiroikuma.gradle'`) —
+// deliberately after upstream's whole `android { }` block has evaluated, so this script reads
+// upstream's literals and overwrites the two version fields with our derived pair, and re-points the
+// signing configs. Nothing in lorie-app/build.gradle itself is edited beyond that one `apply` line,
+// so a rebase never conflicts here. See CLAUDE.md → "Versioning & APK naming" / "Signing" and
+// .claude/skills/build-apk/SKILL.md.
+//
+// Evaluation order matters for the signing part and is guaranteed by upstream itself:
+// lorie/build.gradle calls `evaluationDependsOn` on every other subproject, and `:lorie` is the
+// first subproject Gradle configures (alphabetical), so `:lorie-app` — this script included — is
+// fully evaluated BEFORE `:shell-loader` reads `project(':lorie-app').android.signingConfigs.debug`
+// to compute the loader's BuildConfig.SIGNATURE.
+
+// --- per-build counter (gradle.properties) -------------------------------------------------------
+// N = BUILD_NUMBER, bumped by `buildFork` after every successful build. It runs MONOTONICALLY and
+// is never reset merely because a sync moved the `.g<sha>` pin — an installer compares versionCode
+// alone, and upstream's `versionCode 15` stands still for months on master. Zero-padded to three
+// digits in the NAME only (so +002 sorts before +010); versionCode keeps the plain integer.
+def forkBuildNumber = (project.findProperty('BUILD_NUMBER') ?: '1').toString().trim().toInteger()
+def forkPaddedBuildNumber = String.format('%03d', forkBuildNumber)
+def forkLastBuiltVersionCode = (project.findProperty('LAST_BUILT_VERSION_CODE') ?: '0').toString().trim().toInteger()
+
+// --- upstream-base pin (see the global git-versioning skill) -------------------------------------
+// `custom` is rebased onto every upstream commit (Upstream tracking: git), so upstream's version
+// literal says nothing about how current we are. The pin is the merge-base of HEAD and master (the
+// upstream mirror branch) — the upstream commit our patches sit on. NOT our own HEAD (that is what
+// +NNN already says) and NOT master's tip (which overstates it whenever master has been
+// fast-forwarded but custom not yet rebased).
+//
+// providers.exec, NOT a raw process: a process started at configuration time is refused outright
+// under Gradle's configuration cache, and the provider API registers the git output as a cache
+// input so the pin re-resolves when the base moves. ignoreExitValue so a repo with no local
+// `master` (shallow clone, tarball) degrades to an empty pin rather than failing the build.
+def forkRepoRoot = project.rootDir
+def forkGit = { String... command ->
+    try {
+        providers.exec {
+            commandLine(command)
+            workingDir = forkRepoRoot
+            ignoreExitValue = true
+        }.standardOutput.asText.get().trim()
+    } catch (Exception e) {
+        println("Git command [${command.join(' ')}] failed [$e]")
+        ''
+    }
+}
+
+def upstreamBaseSha = forkGit('git', 'merge-base', 'HEAD', 'master').take(8)
+
+// That same commit's COMMITTER date, so versions sort chronologically — a bare sha orders them at
+// random. In UTC, formatted from the raw epoch: the commit's own zone and the build host's zone both
+// misstate the hour, and minute resolution puts that error in plain sight.
+def upstreamBaseStamp = ''
+if (upstreamBaseSha.length() == 8) {
+    def epoch = forkGit('git', 'show', '-s', '--format=%ct', upstreamBaseSha)
+    if (epoch ==~ /\d+/) {
+        upstreamBaseStamp = java.time.Instant.ofEpochSecond(epoch.toLong())
+                .atZone(java.time.ZoneOffset.UTC)
+                .format(java.time.format.DateTimeFormatter.ofPattern('yyyy-MM-dd.HH-mm'))
+    }
+}
+
+// `+` opens each top-level group; the pin's own date, time and sha are dot-joined inside it.
+def upstreamPin = ''
+if (upstreamBaseSha.length() == 8) {
+    upstreamPin = upstreamBaseStamp.length() == 16
+            ? "+${upstreamBaseStamp}.g${upstreamBaseSha}"
+            : "+g${upstreamBaseSha}"
+}
+
+// --- derive our version from upstream's literals (read, never edited) ----------------------------
+// Upstream's versionName is COMPUTED: lorie/version.gradle builds termuxX11VersionName as
+// "1.03.01-<short sha of HEAD>-<dd.MM.yy of build time>". Both of those tails are exactly what the
+// pin is NOT (our HEAD instead of the upstream base; build time instead of the base's commit time),
+// so doubling them up would be noise. Our base is therefore the bare literal — the
+// `def version = "1.03.01"` line of lorie/version.gradle — read with the same regex upstream's own
+// companion package uses for its Debian version (shell-loader/companion-package.gradle). The file
+// stays byte-identical, so a rebase carries a new upstream literal in by itself.
+//   versionName = "<literal>+<base date>.<HH-MM>.g<sha8>+<BUILD_NUMBER padded to 3>"
+//                                 e.g. 1.03.01+2026-09-10.23-47.g53f84373+001
+//   versionCode = <upstream code> * 10000 + BUILD_NUMBER               e.g. 15 * 10000 + 1 = 150001
+def forkVersionGradle = rootProject.file('lorie/version.gradle')
+def forkUpstreamVersionMatch = (forkVersionGradle.text =~ /version = "([^"]+)"/)
+if (!forkUpstreamVersionMatch.find())
+    throw new GradleException("shiroikuma fork: no `version = \"…\"` literal found in ${forkVersionGradle}")
+def upstreamVersionName = forkUpstreamVersionMatch.group(1)
+def upstreamVersionCode = android.defaultConfig.versionCode
+def forkVersionName = "${upstreamVersionName}${upstreamPin}+${forkPaddedBuildNumber}".toString()
+def forkVersionCode = upstreamVersionCode * 10000 + forkBuildNumber
+android.defaultConfig.versionName = forkVersionName
+android.defaultConfig.versionCode = forkVersionCode
+
+// --- signing (gitignored keystore.properties; see the build-apk skill) ---------------------------
+// The ONE keystore of the whole com.termux shared-UID family
+// (~/.android-keystores/shiroikuma-emacs-termux.jks, alias "Emacs keystore") signs everything here:
+//
+//  * `release` — created from keystore.properties and wired to buildTypes.release, which upstream
+//    leaves unsigned (they ship the debug build).
+//  * `debug`   — upstream's testkey_untrusted.jks is REPLACED by the same keystore. This is the
+//    load-bearing part: shell-loader/build.gradle computes the loader's BuildConfig.SIGNATURE (the
+//    certificate hash the `termux-x11` CLI checks against the installed app before it will load it)
+//    from `project(':lorie-app').android.signingConfigs.debug`. Re-pointing that config, instead of
+//    editing shell-loader/build.gradle to read `.release`, keeps upstream's file byte-identical, and
+//    makes every APK this tree can produce — debug or release, either flavour — carry the one
+//    certificate the companion package's loader expects.
+//
+// Absent keystore.properties nothing is touched: the debug build keeps upstream's test key, the
+// release build stays unsigned like upstream's (`assembleSharedUidRelease` still works for a
+// toolchain check), and `buildFork` refuses to run (below).
+def forkKeystorePropertiesFile = rootProject.file('keystore.properties')
+if (forkKeystorePropertiesFile.exists()) {
+    def forkKeystoreProperties = new Properties()
+    forkKeystorePropertiesFile.withInputStream { forkKeystoreProperties.load(it) }
+    def forkStoreFile = rootProject.file(forkKeystoreProperties.getProperty('storeFile'))
+    def forkStorePassword = forkKeystoreProperties.getProperty('storePassword')
+    def forkKeyAlias = forkKeystoreProperties.getProperty('keyAlias')
+    def forkKeyPassword = forkKeystoreProperties.getProperty('keyPassword')
+
+    android.signingConfigs.getByName('debug') {
+        storeFile = forkStoreFile
+        storePassword = forkStorePassword
+        keyAlias = forkKeyAlias
+        keyPassword = forkKeyPassword
+    }
+    android.signingConfigs.create('release') {
+        storeFile = forkStoreFile
+        storePassword = forkStorePassword
+        keyAlias = forkKeyAlias
+        keyPassword = forkKeyPassword
+    }
+    android.buildTypes.release.signingConfig = android.signingConfigs.release
+}
+
+// --- release build type --------------------------------------------------------------------------
+// Upstream never configures `release` (its nightly IS the debug build). We ship the release variant,
+// so give it the same R8 treatment upstream tests and ships on debug — minified and resource-shrunk
+// with lorie-app/proguard-rules.pro (`-dontobfuscate`) plus :lorie's consumer keep rules for the
+// JNI entry points. The only intended difference from upstream's artefact is `debuggable false`.
+android.buildTypes.getByName('release') {
+    minifyEnabled = true
+    shrinkResources = true
+    proguardFiles('proguard-rules.pro')
+}
+
+// --- buildFork -----------------------------------------------------------------------------------
+// Build the signed sharedUid release APK AND the companion package (the .deb that puts the
+// `termux-x11` CLI + loader into the Termux prefix; its loader only accepts our certificate, so the
+// two ship together), copy both to ~/tmp under the house filenames — the same version string on
+// each — then bump BUILD_NUMBER and record the code we just shipped. Every guard runs BEFORE the
+// (long, four-ABI) native build, from the task graph, not from doFirst.
+def forkApkName = "shiroikuma-termux-x11_${forkVersionName}_sharedUid.apk".toString()
+def forkDebName = "shiroikuma-termux-x11_${forkVersionName}_termux-x11-nightly.deb".toString()
+def forkReleaseApkDir = layout.buildDirectory.dir('outputs/apk/sharedUid/release')
+def forkCompanionDir = project(':shell-loader').layout.buildDirectory.dir('outputs/companion')
+def forkPropsFile = rootProject.file('gradle.properties')
+def forkUserHome = System.getProperty('user.home')
+
+def buildForkTask = tasks.register('buildFork') {
+    group = 'build'
+    description = 'Build the signed sharedUid release APK + the companion .deb, copy both to ~/tmp, and bump BUILD_NUMBER.'
+    dependsOn 'assembleSharedUidRelease', ':shell-loader:buildCompanionPackage'
+
+    doLast {
+        def apkDir = forkReleaseApkDir.get().asFile
+        def apk = (apkDir.listFiles({ File d, String n -> n.endsWith('.apk') } as FilenameFilter) ?: new File[0]).find()
+        if (apk == null) throw new GradleException("No APK found in $apkDir")
+
+        def companionDir = forkCompanionDir.get().asFile
+        def deb = (companionDir.listFiles({ File d, String n -> n.endsWith('-all.deb') } as FilenameFilter) ?: new File[0]).find()
+        if (deb == null) throw new GradleException("No companion .deb found in $companionDir")
+
+        def targetDir = new File(forkUserHome, 'tmp')
+        targetDir.mkdirs()
+        def apkTarget = new File(targetDir, forkApkName)
+        apkTarget.bytes = apk.bytes
+        def debTarget = new File(targetDir, forkDebName)
+        debTarget.bytes = deb.bytes
+        println("[1;36m>>> ${apkTarget.absolutePath}[0m")
+        println("[1;36m>>> ${debTarget.absolutePath}[0m")
+        println("[1;36m>>> versionCode ${forkVersionCode}[0m")
+
+        def text = forkPropsFile.text
+        text = text.replaceFirst(/(?m)^BUILD_NUMBER=\d+$/, "BUILD_NUMBER=${forkBuildNumber + 1}")
+        text = text.replaceFirst(/(?m)^LAST_BUILT_VERSION_CODE=\d+$/, "LAST_BUILT_VERSION_CODE=${forkVersionCode}")
+        forkPropsFile.text = text
+        println("[1;36m>>> BUILD_NUMBER bumped to ${forkBuildNumber + 1}[0m")
+    }
+}
+
+gradle.taskGraph.whenReady { graph ->
+    if (!graph.hasTask(buildForkTask.get())) return
+
+    // Fail fast — before CMake spends half an hour on four ABIs — rather than shipping an unsigned
+    // APK that Android would refuse to install over the signed one, with a loader that would then
+    // refuse it too.
+    if (!forkKeystorePropertiesFile.exists()) {
+        throw new GradleException(
+                "keystore.properties is missing at ${forkKeystorePropertiesFile} — buildFork refuses to " +
+                        "produce an unsigned release. Copy keystore.properties_sample and fill in the " +
+                        "shiroikuma-emacs-termux.jks credentials (see CLAUDE.md → Signing).")
+    }
+
+    // `master` tracks bleeding upstream/master, whose versionCode stands still between releases —
+    // so BUILD_NUMBER never resets. This guard turns the one way that could still go backwards (a
+    // hand-edited counter) into a build failure rather than a silent downgrade the installer would
+    // refuse.
+    if (forkVersionCode <= forkLastBuiltVersionCode) {
+        throw new GradleException(
+                "versionCode $forkVersionCode would not exceed the highest already built " +
+                        "($forkLastBuiltVersionCode). Raise BUILD_NUMBER past the last built tail.")
+    }
+}
+
+// Printed once per configuration so a build log always says what it is producing.
+println("[1;36m>>> shiroikuma-termux-x11 ${forkVersionName} (versionCode ${forkVersionCode})[0m")
