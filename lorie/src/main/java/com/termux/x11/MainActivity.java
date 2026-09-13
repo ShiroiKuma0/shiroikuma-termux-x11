@@ -205,6 +205,7 @@ public class MainActivity extends AppCompatActivity {
 
         frm = findViewById(R.id.frame);
         findViewById(R.id.preferences_button).setOnClickListener((l) -> startActivity(new Intent(this, LoriePreferences.class) {{ setAction(Intent.ACTION_MAIN); }}));
+        findViewById(R.id.preferences_button).setOnLongClickListener((l) -> { startActivity(new Intent(this, com.termux.x11.shiroikuma.ShiroikumaUiActivity.class)); return true; }); // shiroikuma fork: long-press → 白い熊 Termux X11 UI
         findViewById(R.id.help_button).setOnClickListener((l) -> startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/ShiroiKuma0/shiroikuma-termux-x11/blob/custom/README.md#running-graphical-applications"))));
         findViewById(R.id.exit_button).setOnClickListener((l) -> finish());
 

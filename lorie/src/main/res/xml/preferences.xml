@@ -3,6 +3,14 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android">
     <PreferenceScreen app:key="main" app:title="@string/lorie_pref_main">
+        <!-- shiroikuma fork (Phase 4): the 白い熊 Termux X11 UI page, first row. A plain Preference with
+             an intent — generatePrefs (lorie/build.gradle) only reads the typed preference nodes, so
+             it does not become a Prefs.java field. -->
+        <Preference app:key="shiroikuma_ui" app:title="@string/shiroikuma_ui_title">
+            <intent android:action="android.intent.action.MAIN"
+                android:targetPackage="com.termux.x11"
+                android:targetClass="com.termux.x11.shiroikuma.ShiroikumaUiActivity" />
+        </Preference>
         <Preference app:title="@string/lorie_pref_output" app:fragment="output" />
         <Preference app:title="@string/lorie_pref_pointer" app:fragment="pointer" />
         <Preference app:title="@string/lorie_pref_kbd" app:fragment="kbd" />
