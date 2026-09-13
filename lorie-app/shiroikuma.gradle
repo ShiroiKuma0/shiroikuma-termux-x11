@@ -178,15 +178,27 @@ if (forkKeystorePropertiesFile.exists()) {
     android.buildTypes.release.signingConfig = android.signingConfigs.release
 }
 
+// --- :lorie dependencies of the fork's own code -------------------------------------------------
+// The 白い熊 Termux X11 UI page (lorie/src/main/java/com/termux/x11/shiroikuma/) writes its backups
+// through the Storage Access Framework, which needs androidx.documentfile — the one AndroidX library
+// upstream's :lorie does not already pull in through androidx.preference (appcompat, core, fragment
+// and activity all arrive transitively). Added from here so lorie/build.gradle stays byte-identical;
+// `withPlugin` fires at once when the library plugin is already applied (the normal case: :lorie's
+// own script applies it before it forces this project's evaluation) and otherwise when it is.
+project(':lorie').pluginManager.withPlugin('com.android.library') {
+    project(':lorie').dependencies.add('implementation', 'androidx.documentfile:documentfile:1.0.1')
+}
+
 // --- release build type --------------------------------------------------------------------------
 // Upstream never configures `release` (its nightly IS the debug build). We ship the release variant,
 // so give it the same R8 treatment upstream tests and ships on debug — minified and resource-shrunk
 // with lorie-app/proguard-rules.pro (`-dontobfuscate`) plus :lorie's consumer keep rules for the
-// JNI entry points. The only intended difference from upstream's artefact is `debuggable false`.
+// JNI entry points, plus our own shiroikuma-proguard.pro for the classes the UI page inflates by
+// name. The only intended difference from upstream's artefact is `debuggable false`.
 android.buildTypes.getByName('release') {
     minifyEnabled = true
     shrinkResources = true
-    proguardFiles('proguard-rules.pro')
+    proguardFiles('proguard-rules.pro', 'shiroikuma-proguard.pro')
 }
 
 // --- buildFork -----------------------------------------------------------------------------------

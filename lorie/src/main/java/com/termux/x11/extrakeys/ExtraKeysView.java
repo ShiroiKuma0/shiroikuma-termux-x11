@@ -114,6 +114,15 @@ public final class ExtraKeysView extends GridLayout {
          */
         boolean performExtraKeyButtonHapticFeedback(View view, ExtraKeyButton buttonInfo, Button button);
 
+        /**
+         * shiroikuma fork: called once a key that neither repeats nor locks has been held for
+         * {@link #mLongPressTimeout}. Return {@code true} to consume the press, so the release
+         * does not also fire {@link #onExtraKeyButtonClick}.
+         */
+        default boolean onExtraKeyButtonLongClick(View view, ExtraKeyButton buttonInfo, Button button) {
+            return false;
+        }
+
         /** (Re)loads the extra keys config, e.g. from preferences. */
         void setExtraKeys();
 
@@ -204,6 +213,8 @@ public final class ExtraKeysView extends GridLayout {
     private ScheduledExecutorService mScheduledExecutor;
     private Handler mHandler;
     private SpecialButtonsLongHoldRunnable mSpecialButtonsLongHoldRunnable;
+    /** shiroikuma fork: the pending {@link IExtraKeysView#onExtraKeyButtonLongClick} of a plain key. */
+    private Runnable mLongClickRunnable;
     private int mLongPressCount;
 
     /** How many characters of a label a button is expected to fit, most preset keys are this short. */
@@ -495,6 +506,17 @@ public final class ExtraKeysView extends GridLayout {
                 mHandler = new Handler(Looper.getMainLooper());
             mSpecialButtonsLongHoldRunnable = new SpecialButtonsLongHoldRunnable(state);
             mHandler.postDelayed(mSpecialButtonsLongHoldRunnable, mLongPressTimeout);
+        } else if (mExtraKeysViewClient != null) {
+            // shiroikuma fork: a plain key held past the long-press timeout is offered to the client;
+            // a consumed long press counts like a repeat, so ACTION_UP does not also click it.
+            if (mHandler == null)
+                mHandler = new Handler(Looper.getMainLooper());
+            mLongClickRunnable = () -> {
+                mLongClickRunnable = null;
+                if (mExtraKeysViewClient.onExtraKeyButtonLongClick(view, buttonInfo, button))
+                    mLongPressCount++;
+            };
+            mHandler.postDelayed(mLongClickRunnable, mLongPressTimeout);
         }
     }
 
@@ -507,6 +529,11 @@ public final class ExtraKeysView extends GridLayout {
         if (mSpecialButtonsLongHoldRunnable != null && mHandler != null) {
             mHandler.removeCallbacks(mSpecialButtonsLongHoldRunnable);
             mSpecialButtonsLongHoldRunnable = null;
+        }
+
+        if (mLongClickRunnable != null && mHandler != null) { // shiroikuma fork
+            mHandler.removeCallbacks(mLongClickRunnable);
+            mLongClickRunnable = null;
         }
     }
 

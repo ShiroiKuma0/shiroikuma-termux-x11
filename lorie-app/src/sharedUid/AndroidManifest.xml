@@ -9,5 +9,12 @@
         <service android:name="com.termux.x11.utils.KeyInterceptor" android:process="com.termux" />
         <receiver android:name="com.termux.x11.LorieBroadcastReceiver" android:process="com.termux" />
         <receiver android:name="com.termux.x11.LoriePreferences$Receiver" android:process="com.termux" />
+        <!-- shiroikuma fork (Phase 4): the 白い熊 Termux X11 UI page and the 保存復元 automation
+             components share the process too, so an import's committed preferences are the very
+             SharedPreferences instances MainActivity and LoriePreferences already hold. -->
+        <activity android:name="com.termux.x11.shiroikuma.ShiroikumaUiActivity" android:process="com.termux" />
+        <receiver android:name="com.termux.x11.shiroikuma.automation.StateExportReceiver" android:process="com.termux" />
+        <provider android:name="com.termux.x11.shiroikuma.automation.AutomationProvider" android:authorities="com.termux.x11.automation" android:process="com.termux" />
+        <service android:name="com.termux.x11.shiroikuma.automation.AutomationDataService" android:process="com.termux" />
     </application>
 </manifest>
