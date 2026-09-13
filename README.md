@@ -1,3 +1,20 @@
+# 白い熊 Termux X11
+
+白い熊's fork of [Termux:X11](https://github.com/termux/termux-x11) (`termux/termux-x11`), the
+Termux X server add-on. Same app id **`com.termux.x11`** (it installs *over* upstream's app, never
+beside it), the `sharedUid` flavour only, signed with the key shared by the whole 白い熊 `com.termux`
+family, and tracking upstream's `master` tip commit by commit.
+
+What changes: the name (**白い熊 Termux X11**), the icon and the links point at this fork; the build
+is a signed release APK plus the companion `termux-x11-nightly` `.deb` whose loader accepts this
+fork's signature. Everything else is upstream's — the README below is theirs.
+
+Builds: [releases](https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases) — install the
+`…_sharedUid.apk`, then in Termux `dpkg -i` the matching `…_termux-x11-nightly.deb` and
+`apt-mark hold termux-x11-nightly` (upstream's package from packages.termux.dev refuses this
+fork's signature).
+
+---
 
 # Termux:X11
 
