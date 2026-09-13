@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- shiroikuma-termux-x11 fork (Phase 4): every string of the 白い熊 Termux X11 UI page, its
+     Export / Import panel, and the 保存復元 automation contract. Upstream's strings.xml is untouched. -->
+<resources>
+    <string name="shiroikuma_ui_title">白い熊 Termux X11 UI</string>
+    <string name="shiroikuma_ui_shortcut_short">白い熊 Termux X11 UI</string>
+    <string name="shiroikuma_ui_shortcut_long">白い熊 Termux X11 UI — Export / Import</string>
+
+    <!-- Export / Import section (the first section of the page; the automation rows live inside it) -->
+    <string name="shiroikuma_ui_section_eim">Export / Import</string>
+    <string name="shiroikuma_eim_entry">Export / Import…</string>
+    <string name="shiroikuma_eim_entry_desc">Back up every preference of this app to one .zip, and restore it.</string>
+    <string name="shiroikuma_eim_dir">Export directory</string>
+    <string name="shiroikuma_eim_dir_unset">not set</string>
+    <string name="shiroikuma_eim_dir_unset_long">Not set — tap to choose a folder</string>
+    <string name="shiroikuma_eim_dir_regrant">Access lost with the install — tap to choose it again</string>
+    <string name="shiroikuma_eim_last">Last export</string>
+    <string name="shiroikuma_eim_last_none">none</string>
+    <string name="shiroikuma_eim_last_nodir">no directory</string>
+    <string name="shiroikuma_eim_last_value">%1$s · %2$s</string>
+
+    <!-- the panel -->
+    <string name="shiroikuma_eim_title">Export / Import</string>
+    <string name="shiroikuma_eim_desc">Tick what to carry, then export it as a single .zip — or import one and restore just those parts.</string>
+    <string name="shiroikuma_eim_dir_caption">Export directory (tap to choose)</string>
+    <string name="shiroikuma_eim_warn_nodir">No export directory set.</string>
+    <string name="shiroikuma_eim_warn_regrant">The export directory has to be chosen again.</string>
+    <string name="shiroikuma_eim_warn_none">No export in this directory yet.</string>
+    <string name="shiroikuma_eim_last_line">Last export: %1$s</string>
+    <string name="shiroikuma_eim_select_all">全選択</string>
+    <string name="shiroikuma_eim_export">Export</string>
+    <string name="shiroikuma_eim_import">Import</string>
+    <string name="shiroikuma_eim_none_selected">No categories selected.</string>
+    <string name="shiroikuma_eim_pick_backup">Choose a backup</string>
+    <string name="shiroikuma_eim_browse">Browse…</string>
+    <string name="shiroikuma_eim_export_done_title">Export finished</string>
+    <string name="shiroikuma_eim_export_done_body">Written to:\n%1$s\n\n%2$s · %3$d categories</string>
+    <string name="shiroikuma_eim_export_fail_title">Export failed</string>
+    <string name="shiroikuma_eim_export_fail">Export failed: %1$s</string>
+    <string name="shiroikuma_eim_import_done_title">Import finished</string>
+    <string name="shiroikuma_eim_import_fail_title">Import failed</string>
+    <string name="shiroikuma_eim_import_fail">Import failed: %1$s</string>
+    <string name="shiroikuma_eim_import_none">Not a 白い熊 Termux X11 export.</string>
+    <string name="shiroikuma_eim_import_nothing">Nothing to restore.</string>
+    <string name="shiroikuma_eim_restart_hint">Restart the X window to apply every restored preference.</string>
+    <string name="shiroikuma_eim_restart_later">Later</string>
+    <string name="shiroikuma_eim_restart_now">Restart now</string>
+    <string name="shiroikuma_eim_cat_settings">Preferences (display · pointer · keyboard · extra keys)</string>
+    <string name="shiroikuma_eim_settings_result">%1$d keys in %2$d files</string>
+
+    <!-- 保存復元 automation contract v2 — the three rows inside the Export / Import section -->
+    <string name="shiroikuma_auto_switch">Automation export</string>
+    <string name="shiroikuma_auto_switch_desc">Let sister apps (白い熊 応用管理, 白い熊 自由作業盤) run this export headlessly and back its data up. On by default.</string>
+    <string name="shiroikuma_auto_require_token">Use authorization token?</string>
+    <string name="shiroikuma_auto_require_token_desc">Off: any sister app may drive the automation. On: a caller must also present the token below. Either way the data door checks the caller’s package name and signature.</string>
+    <string name="shiroikuma_auto_token">Automation token</string>
+    <string name="shiroikuma_auto_token_desc">Tap to copy the full token · paste it into 自由作業盤「保存復元の設定」</string>
+    <string name="shiroikuma_auto_regenerate">Regenerate</string>
+    <string name="shiroikuma_auto_token_copied">Token copied to the clipboard.</string>
+    <string name="shiroikuma_auto_token_regen_title">Regenerate the token?</string>
+    <string name="shiroikuma_auto_token_regen_msg">The old token stops working at once. Every copy already pasted into 白い熊 自由作業盤 must be updated.</string>
+    <string name="shiroikuma_auto_token_regenerated">New token generated — update the pasted copies.</string>
+    <string name="shiroikuma_auto_notif_channel">Automation data</string>
+    <string name="shiroikuma_auto_notif_export">Writing preferences out…</string>
+    <string name="shiroikuma_auto_notif_import">Restoring preferences…</string>
+    <string name="shiroikuma_auto_notif_spooling">Reading the backup…</string>
+
+    <!-- Reset -->
+    <string name="shiroikuma_ui_section_reset">Reset</string>
+    <string name="shiroikuma_ui_reset">Reset the 白い熊 UI preferences</string>
+    <string name="shiroikuma_ui_reset_desc">Clears everything this page stores of its own (the shiroikuma_ui file). The app’s own preferences, the export directory and the automation switch are left alone.</string>
+    <string name="shiroikuma_ui_reset_confirm_title">Reset the 白い熊 UI preferences?</string>
+    <string name="shiroikuma_ui_reset_confirm_msg">The shiroikuma_ui preferences file is cleared. This cannot be undone.</string>
+    <string name="shiroikuma_ui_reset_done">白い熊 UI preferences cleared.</string>
+</resources>

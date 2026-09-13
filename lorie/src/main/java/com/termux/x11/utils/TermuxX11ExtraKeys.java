@@ -167,6 +167,15 @@ public class TermuxX11ExtraKeys implements ExtraKeysView.IExtraKeysView {
         return false;
     }
 
+    /** shiroikuma fork: a long press on the PREFERENCES (gear) key opens the 白い熊 Termux X11 UI page. */
+    @Override
+    public boolean onExtraKeyButtonLongClick(View view, ExtraKeyButton buttonInfo, Button button) {
+        if (buttonInfo.macro || !"PREFERENCES".equals(buttonInfo.key))
+            return false;
+        mActivity.startActivity(new Intent(mActivity, com.termux.x11.shiroikuma.ShiroikumaUiActivity.class));
+        return true;
+    }
+
     @SuppressLint("RtlHardcoded")
     public void onLorieExtraKeyButtonClick(View view, String key, boolean ctrlDown, boolean altDown, boolean shiftDown, boolean metaDown, boolean fnDown) {
         if ("KEYBOARD".equals(key))

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- shiroikuma-termux-x11 fork (Phase 4): the theme of the 白い熊 Termux X11 UI page — black ground,
+     yellow ink, yellow accent (switch and checkbox tint). Upstream's styles.xml is untouched. -->
+<resources>
+    <style name="ShiroikumaUiTheme" parent="@style/Theme.AppCompat.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="colorPrimary">@android:color/black</item>
+        <item name="colorPrimaryDark">@android:color/black</item>
+        <item name="colorAccent">#FFFF00</item>
+        <item name="android:textColorPrimary">#FFFF00</item>
+        <item name="android:textColorSecondary">#C8C800</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="preferenceTheme">@style/PreferenceThemeOverlay</item>
+    </style>
+</resources>
