@@ -92,6 +92,51 @@ def forkVersionCode = upstreamVersionCode * 10000 + forkBuildNumber
 android.defaultConfig.versionName = forkVersionName
 android.defaultConfig.versionCode = forkVersionCode
 
+// --- BuildConfig overrides in the sibling modules (their build files stay byte-identical) --------
+// Two upstream build files bake user-visible strings into a BuildConfig, and both are on the
+// never-edit list (CLAUDE.md → Hard rules):
+//  * lorie/build.gradle sets :lorie's BuildConfig.VERSION_NAME — the "version" row of the
+//    preferences screen — to upstream's computed "1.03.01-<sha>-<dd.MM.yy>"; the fork shows its own
+//    versionName there instead.
+//  * shell-loader/build.gradle bakes the `termux-x11` CLI's "application is not found" and
+//    "signature mismatch" messages, naming Termux:X11 and upstream's releases page; the fork's loader
+//    names 白い熊 Termux X11 and our releases page.
+// AGP's variant API runs these callbacks at variant creation, after the DSL values are seeded, and a
+// `put` of an existing key replaces it — independent of which project Gradle evaluated first
+// (`withPlugin` fires at once if the plugin is already applied, otherwise when it is). Everything
+// else in those files, the loader's SIGNATURE constant included, is untouched.
+def forkAppName = '白い熊 Termux X11'
+def forkReleasesUrl = 'https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases'
+def forkApplicationId = android.defaultConfig.applicationId
+def forkOverrideBuildConfig = { String projectPath, Map<String, String> fields ->
+    def target = project(projectPath)
+    ['com.android.application', 'com.android.library'].each { pluginId ->
+        target.pluginManager.withPlugin(pluginId) {
+            def components = target.androidComponents
+            // AGP's classes are not on an `apply from:` script's compile classpath, so the field's
+            // constructor is reached through the extension's own classloader.
+            def fieldClass = components.class.classLoader.loadClass('com.android.build.api.variant.BuildConfigField')
+            components.onVariants(components.selector().all()) { variant ->
+                fields.each { name, javaLiteral ->
+                    variant.buildConfigFields.put(name, fieldClass.newInstance('String', javaLiteral, null))
+                }
+            }
+        }
+    }
+}
+forkOverrideBuildConfig(':lorie', [
+        VERSION_NAME: '"' + forkVersionName + '"',
+])
+forkOverrideBuildConfig(':shell-loader', [
+        packageNotInstalledErrorText:
+                '"' + forkAppName + ' application is not found.\\n" +\n' +
+                '"You should choose latest release here: \\n ' + forkReleasesUrl + '\\n" +\n' +
+                '"After this you should download \\"shiroikuma-termux-x11_<version>_sharedUid.apk\\" and install it.\\n"',
+        packageSignatureMismatchErrorText:
+                '"Signature verification of target application ' + forkApplicationId + ' failed.\\n' +
+                'Please, reinstall both termux-x11 package and ' + forkAppName + ' application from the same source"',
+])
+
 // --- signing (gitignored keystore.properties; see the build-apk skill) ---------------------------
 // The ONE keystore of the whole com.termux shared-UID family
 // (~/.android-keystores/shiroikuma-emacs-termux.jks, alias "Emacs keystore") signs everything here:
