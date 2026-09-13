@@ -56,3 +56,5 @@ tasks.matching { it.name == 'assembleDebug' }.configureEach { dependsOn ':shell-
 dependencies {
     implementation project(':lorie')
 }
+
+apply from: 'shiroikuma.gradle' // shiroikuma-termux-x11 fork: version pin, signing, buildFork — must stay the LAST line

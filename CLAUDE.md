@@ -1,0 +1,209 @@
+# CLAUDE.md — guide for Claude Code in this repo
+
+**shiroikuma-termux-x11** — 白い熊's fork of [Termux:X11](https://github.com/termux/termux-x11),
+the Termux X server add-on: a full X.Org server (`xserver` + 15 more submodules, built with the NDK
+through CMake) wrapped in a small Java app (`lorie`), plus a companion Termux package that carries the
+`termux-x11` CLI and its loader (`shell-loader`). GPL-3.0. Package id stays **`com.termux.x11`**
+(installs *over* upstream, never beside it); the app is **白い熊 Termux X11**.
+
+This repo (`ShiroiKuma0/shiroikuma-termux-x11`) is a fork. We track upstream's **`master` branch
+tip** on `master` and layer our customizations on `custom`.
+
+## Read this first
+
+Before any work, read **`.claude/skills/build-apk/SKILL.md`** (canonical build + delivery — the APK
+*and* the companion `.deb`) and **`.claude/skills/upstream-new-version/SKILL.md`** (upstream sync +
+rebase, with the mandatory proceed-gated upstream-changes table). Publishing a release uses the
+**global** `/publish-version` skill — this repo has no local copy.
+
+## Fork workflow — READ THIS FIRST
+
+### Git remotes & branches
+
+- `origin` → `git@github.com:ShiroiKuma0/shiroikuma-termux-x11.git` (push here).
+- `upstream` → `https://github.com/termux/termux-x11.git` (fetch only; its push URL is `DISABLED`).
+- `master` — mirrors `upstream/master`, **fast-forward only**. No fork work here.
+- `custom` — all our work, rebased onto `master` on each sync, and the GitHub default branch so the
+  repo page lands on the fork.
+- **Submodules:** 16 of them under `lorie/src/main/cpp/` (xserver, libx11, pixman, …), pinned by
+  upstream's gitlinks. `git submodule update --init --recursive` after every clone and after every
+  sync that moves a gitlink; we never carry a submodule change of our own.
+
+**Upstream tracking: `git`** — the branch tip, not tags. Termux:X11 has **no releases**: its only tag
+is `nightly`, which CI moves onto every `master` commit, and the version literal (`1.03.01` in
+`lorie/version.gradle`, `versionCode 15` in `lorie-app/build.gradle`) stands still for months while
+`master` changes daily. So `custom` is rebased onto every upstream commit and the fork versionName
+pins the upstream base — the global **`git-versioning`** skill applies (see below).
+
+### Our customizations (install identity + build)
+
+| What | Value | Where |
+| --- | --- | --- |
+| applicationId | `com.termux.x11` (**unchanged** — the `termux-x11` CLI, the loader and Termux's package tooling all hardcode it) | `lorie-app/build.gradle` → `defaultConfig` (upstream's line, untouched) |
+| namespace (R/BuildConfig pkg) | `com.termux.x11.app` (app) / `com.termux.x11` (lib) — **never rename** | `lorie-app/build.gradle`, `lorie/build.gradle` |
+| sharedUserId / process | `com.termux` — the **`sharedUid` flavour**, the only one we build | `lorie-app/src/sharedUid/AndroidManifest.xml` (upstream's overlay) |
+| App label | `白い熊 Termux X11` — **pending (Phase 3)**; today upstream's `Termux:X11` | `TERMUX_X11_APP_NAME` ENTITY → `lorie_app_name` in `lorie/src/main/res/values/strings.xml` |
+| App icon | black-yellow traced X mark — **pending (Phase 2)**; today upstream's | `lorie/src/main/res/mipmap-*/lorie_ic_launcher*`, `mipmap-anydpi-v26/*.xml`, `values/lorie_ic_launcher_background.xml` |
+| Fork links | `https://github.com/ShiroiKuma0/shiroikuma-termux-x11` — **pending (Phase 3)** | `MainActivity.java` (help button, ~l. 208), shell-loader `packageNotInstalledErrorText`, README |
+| 白い熊 Termux X11 UI | the house UI page + Export/Import — **pending (Phase 4)** | — |
+| Version tail | `versionName = "1.03.01+<base date>.<HH-MM>.g<sha8>+NNN"`, `versionCode = 15*10000+N` | `lorie-app/shiroikuma.gradle` |
+| Signing | gitignored `keystore.properties` → `~/.android-keystores/shiroikuma-emacs-termux.jks` (alias `Emacs keystore`) for **both** `signingConfigs.release` and `signingConfigs.debug` | `lorie-app/shiroikuma.gradle` |
+| Release build type | R8 minify + resource shrink with `lorie-app/proguard-rules.pro`, mirroring upstream's debug config; `debuggable false` | `lorie-app/shiroikuma.gradle` |
+| Build task | `buildFork` = `assembleSharedUidRelease` + `:shell-loader:buildCompanionPackage` → APK + `.deb` to `~/tmp` → bump | `lorie-app/shiroikuma.gradle` |
+| Hook | the one added line `apply from: 'shiroikuma.gradle'` — **must stay the LAST line** | `lorie-app/build.gradle` |
+
+Everything of ours in the build lives in the **additive** `lorie-app/shiroikuma.gradle`; upstream's
+build files are byte-identical apart from that single `apply` line, so a rebase never conflicts in
+Gradle.
+
+### Signing — why the debug config is ours too
+
+The companion package's loader (`shell-loader/src/main/java/com/termux/x11/Loader.java`) refuses to
+`PathClassLoader` the installed app unless `Signature.hashCode()` of the app's certificate equals
+`BuildConfig.SIGNATURE`, and `shell-loader/build.gradle` computes that constant at build time from
+**`project(':lorie-app').android.signingConfigs.debug`**. Upstream ships the debug build, so for them
+the two agree by construction. We ship a release build signed with the family keystore, so
+`shiroikuma.gradle` re-points **`signingConfigs.debug`** at that same keystore (besides creating
+`release` from it). Result: the loader's constant and every APK this tree can produce — debug or
+release, either flavour — carry the one certificate, and `shell-loader/build.gradle` stays
+upstream's. (The alternative, a one-line edit of that file to read `.release`, would leave debug
+builds unloadable and add a rebase-conflict point for nothing.) Evaluation order makes this safe:
+`lorie/build.gradle` `evaluationDependsOn`s every other subproject and `:lorie` is configured first,
+so `:lorie-app` — `shiroikuma.gradle` included — is done before `:shell-loader` reads the config.
+
+**On the phone this has a consequence:** upstream's `termux-x11-nightly` package from
+packages.termux.dev carries a loader built against upstream's test key, so with our app installed the
+stock `termux-x11` command prints *"Signature verification of target application com.termux.x11
+failed"*. The fork's own `.deb` (built by `buildFork`, delivered next to the APK) must be installed in
+Termux — `dpkg -i shiroikuma-termux-x11_<ver>_termux-x11-nightly.deb` — and pinned with
+`apt-mark hold termux-x11-nightly`, or the next `pkg upgrade` swaps the loader back.
+
+### CHANGELOG.md is unified — never fork it, never overwrite upstream's
+
+Upstream ships **no** `CHANGELOG.md` (its history is the `nightly` release's "Based on <sha>" line
+and `git log`). Ours is a root `CHANGELOG.md` created by the first `/publish-version`; every release
+section carries (a) our own changes and (b) an **"Upstream since `<previous base sha>`"** subsection
+distilled from the proceed-gate table of the `/upstream-new-version` run(s) that moved the base — that
+is the "merged changelog" published with each release. Our sections sit at the top, newest first,
+`## 白い熊 Termux X11 <tag> — <YYYY-MM-DD>`, each naming the upstream base it is built on; only the
+first lists everything, the rest are per-release deltas. Should upstream ever add a `CHANGELOG.md`,
+ours moves above it and upstream's text is never edited (`git diff CHANGELOG.md | grep -c '^-[^-]'`
+→ `0`). The same text goes in the GitHub release notes; the **global `/publish-version`** does both.
+
+### Versioning & APK naming
+
+- **Upstream tracking: `git`** — `custom` is rebased onto every upstream commit, so the fork
+  versionName pins the upstream base:
+  `<upstream>+<base date>.<HH-MM>.g<sha>+<BUILD_NUMBER, 3 digits>`.
+  See the global **`git-versioning`** skill.
+- The upstream base is **read, never edited**: the literal `def version = "1.03.01"` in
+  `lorie/version.gradle` (matched by regex — the same one upstream's companion package uses for its
+  Debian version) and `versionCode 15` in `lorie-app/build.gradle`. Upstream's own *computed*
+  versionName (`1.03.01-<short sha>-<dd.MM.yy>`) is **not** our base: its sha is our HEAD and its
+  date is build time, which is exactly what the pin must not be. `lorie`'s
+  `BuildConfig.VERSION_NAME` (the "version" row of the preferences screen) still shows that upstream
+  string — a Phase 3 call whether to override it.
+- The pin is `git merge-base HEAD master` (the upstream commit our patches sit on — not our HEAD, not
+  `master`'s tip) shortened to 8 chars, plus that commit's committer date **and time, in UTC**
+  (`%ct` epoch → `yyyy-MM-dd.HH-mm`). It moves only on a sync.
+- `BUILD_NUMBER` (in `gradle.properties`) is our per-build `N`:
+  `versionName = "1.03.01+<YYYY-MM-DD>.<HH-MM>.g<sha8>+<NNN>"` (e.g.
+  `1.03.01+2026-09-10.23-47.g53f84373+001`), `versionCode = 15 * 10000 + N` (e.g. `150001`).
+  Zero-padded to 3 digits **in the name only**. The `buildFork` task bumps it after every successful
+  build.
+- **`BUILD_NUMBER` runs MONOTONICALLY. Reset it to `1` ONLY if upstream's `versionCode 15` itself
+  moves** — never merely because a sync moved the `.g<sha>` pin. An installer compares `versionCode`
+  and nothing else; resetting `N` on a sync that left the code at 15 would send `versionCode`
+  backwards and make every sync a downgrade. `buildFork` enforces this: it records
+  `LAST_BUILT_VERSION_CODE` in `gradle.properties` and **refuses to build** a `versionCode` that does
+  not exceed it. Raise `BUILD_NUMBER` past the last built tail; never lower it.
+- Artefacts, both carrying the **same** version string, copied to `~/tmp/`:
+  `shiroikuma-termux-x11_<versionName>_sharedUid.apk` (the universal 4-ABI APK of the `sharedUid`
+  flavour) and `shiroikuma-termux-x11_<versionName>_termux-x11-nightly.deb` (the companion package;
+  its *internal* Debian version stays upstream's `1.03.01-0` so it replaces the stock
+  `termux-x11-nightly` in place). The versionName contains no `_` and no `~` — Debian forbids the
+  first in a version and `git check-ref-format` the second.
+
+### Build commands
+
+```bash
+# Our build: signed sharedUid release APK + companion .deb → ~/tmp + bump BUILD_NUMBER (use this)
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew buildFork --console=plain < /dev/null
+# Release APK only (no copy / no bump)
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew :lorie-app:assembleSharedUidRelease
+# Companion package only (.deb + .pkg.tar.xz under shell-loader/build/outputs/companion/)
+JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 ./gradlew :shell-loader:buildCompanionPackage
+```
+
+We build **only the `sharedUid` flavour** (`flavorDimensions "uid"`): `sharedUserId="com.termux"` +
+`android:process="com.termux"` for every component, `targetSdkVersion 28`. It keeps the X window out
+of Android's background-cpuset throttling of Termux and — since the whole family is signed with the
+one keystore — matches Termux's signature by construction. The `standalone` flavour is upstream's
+and we don't build it. A cold build compiles the X server for all four ABIs (no `abiFilters`, as
+upstream) and takes **tens of minutes** — run it in the background and poll; never abandon it.
+
+### Toolchain
+
+- JDK **21** at `/usr/lib/jvm/java-21-openjdk-amd64` (the host default `java` is JDK 11; Gradle 9.x
+  aborts on it — always set `JAVA_HOME`).
+- Android SDK at `~/android-sdk`; `compileSdk 34`, `minSdk 24`, `targetSdk 34` (28 in `sharedUid`).
+  NDK **`29.0.14206865`** exactly (`termuxX11NdkVersion` in `lorie/version.gradle`), CMake ≥ 3.22
+  (the SDK's `3.22.1`; `cmake` is also on PATH), `python3`, `bison`, `patch`.
+- Gradle wrapper 9.7.1, AGP 9.3.1 (`build.gradle` classpath), `org.gradle.jvmargs=-Xmx1536m`.
+- Gradle needs `local.properties` with `sdk.dir=/home/shiroikuma/android-sdk` (gitignored).
+
+## Architecture (upstream Termux:X11)
+
+Four Gradle projects: `:lorie` (library — the app's whole Java side + the native X server),
+`:lorie-app` (the thin application shell: manifest, flavours, signing), `:shell-loader` (the
+`termux-x11` CLI loader APK + the `.deb`/`.pkg.tar.xz` companion packages) and `:shell-loader:stub`
+(hidden-API stubs). `:lorie` derives `BuildConfig.APPLICATION_ID` from whichever app module depends
+on it.
+
+| Area | Where |
+| --- | --- |
+| Activity, X view, preferences, broadcast entry points | `lorie/src/main/java/com/termux/x11/{MainActivity,LorieView,LoriePreferences,LorieBroadcastReceiver}.java` |
+| `termux-x11` CLI side inside the app process | `lorie/src/main/java/com/termux/x11/CmdEntryPoint.java` (+ `cpp/lorie/cmdentrypoint.cpp`) |
+| Touch/mouse/keyboard input | `lorie/src/main/java/com/termux/x11/input/`, `utils/` |
+| Extra-keys bar | `lorie/src/main/java/com/termux/x11/extrakeys/` |
+| Preferences screen (generates `Prefs.java` at build time) | `lorie/src/main/res/xml/preferences.xml`, `lorie/build.gradle` → `generatePrefs` |
+| Native X server glue (DDX) | `lorie/src/main/cpp/lorie/`, recipes in `cpp/recipes/*.cmake`, patches in `cpp/patches/` |
+| Submodules (X.Org stack) | `lorie/src/main/cpp/{xserver,libx11,pixman,libepoxy,…}` |
+| Strings (with the `TERMUX_X11_APP_NAME` ENTITY), icons | `lorie/src/main/res/values/strings.xml`, `res/mipmap-*/` |
+| App shell, flavours, signing | `lorie-app/build.gradle`, `lorie-app/src/{main,sharedUid}/AndroidManifest.xml` |
+| Loader + companion package | `shell-loader/src/main/java/com/termux/x11/Loader.java`, `shell-loader/companion-package.gradle`, `shell-loader/scripts/*.in` |
+| Version literals | `lorie/version.gradle` (`1.03.01`, NDK), `lorie-app/build.gradle` (`versionCode 15`) |
+| Our layer | `lorie-app/shiroikuma.gradle`, `gradle.properties` (fork block), `CLAUDE.md`, `.claude/skills/` |
+
+## Hard rules
+
+- **Never rename `applicationId`, the namespaces, or `sharedUserId`.** `com.termux.x11` is baked into
+  the `termux-x11` CLI, the loader and Termux's own package tooling; renaming would mean hosting a
+  package repo forever.
+- **Never commit/push unprompted.** Build, deliver, and stop; 白い熊 tests. Commit + push only on
+  their explicit **"Push"** — that means commit, then `git push --force-with-lease origin custom`
+  (`master` fast-forwards with a plain push).
+- **The same keystore as the rest of the com.termux family** — `shiroikuma-emacs-termux.jks`. A
+  shared UID demands one certificate across Termux, Termux:API, Termux:X11, Termux:GUI and Emacs;
+  changing it later means uninstall + restore for everything.
+- **Deliver the `.deb` with the APK, every time**, and tell 白い熊 to `dpkg -i` it in Termux and
+  `apt-mark hold termux-x11-nightly` — upstream's package refuses our signature.
+- `keystore.properties`, `local.properties` and `*.jks` are gitignored — never commit them
+  (upstream's tracked `lorie-app/testkey_untrusted.jks` is exempted from the rule and stays as is).
+- **Always run `adb`, `scp` and `git status`/`git diff` with `dangerouslyDisableSandbox: true`**
+  (the sandbox blocks adb's server socket and invents phantom untracked files at the repo root).
+- **After ANY functional change, build and deliver automatically** — the global `/after-build`
+  standing authorization; never wait for "build it". Every build bumps `BUILD_NUMBER`; never
+  overwrite or delete an older APK or `.deb`, in `~/tmp/` or on the phone.
+- On new upstream commits, run the **`upstream-new-version`** skill — it presents the proceed-gated
+  changes table **before** any rebasing, then fast-forwards `master`, rebases `custom`, updates the
+  submodules, and builds the next `+NNN` (no `BUILD_NUMBER` reset).
+- **Rebase grep guard:** after every rebase, `grep -rn "Termux:X11\|termux/termux-x11" lorie/src/main/res/values/strings.xml lorie/src/main/java shell-loader/build.gradle README.md` must show only what Phase 3 deliberately left (code namespaces, upstream attribution) — every reintroduced brand string or link gets re-de-branded.
+- **Never edit upstream's version literals** (`lorie/version.gradle`, `lorie-app/build.gradle`) or
+  `shell-loader/build.gradle` — the fork reads them; `shiroikuma.gradle` is where our build lives.
+
+## Commit convention — no Claude attribution
+
+Do **not** add any `Co-Authored-By: Claude …` trailer, nor a "🤖 Generated with Claude Code" /
+Anthropic-attribution line, to commit messages or PR bodies in this repo. End the message at the last
+line of the body. This overrides the harness default. (Global rule: `~/.claude/CLAUDE.md`.)
