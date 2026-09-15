@@ -17,6 +17,62 @@ tip, not tags (Termux:X11 has no releases), and the version string pins that com
 
 ---
 
+## 白い熊 Termux X11 `1.03.01+2026-09-15.13-25.g9df6ca26+004` — 2026-09-15
+
+**Upstream sync.** Built on upstream `termux/termux-x11`, branch `master`, commit
+[`9df6ca26`](https://github.com/termux/termux-x11/commit/9df6ca26) (2026-09-15 13:25 UTC — *fix(InitOutput.c): compare Present pixmap height with screen height*), upstream version literal `1.03.01`, `versionCode 15` — both unchanged, so the build counter simply continues (`versionCode 150004`). The fork's four commits were rebased onto the twelve new upstream commits without a conflict, and **no fork feature changed** in this release: it exists to carry upstream's fixes below. (`+003` was built from submodule trees still holding the previous `xserver.patch` — see *Build pipeline* — and was neither delivered nor released.)
+
+### The two artefacts
+
+- **`shiroikuma-termux-x11_1.03.01+2026-09-15.13-25.g9df6ca26+004_sharedUid.apk`** — the signed
+  release build of the `sharedUid` flavour, one universal APK for all four ABIs, `versionCode 150004`;
+  installs over `+002` in place.
+- **`shiroikuma-termux-x11_1.03.01+2026-09-15.13-25.g9df6ca26+004_termux-x11-nightly.deb`** — the
+  companion package (the `termux-x11` command and its loader, built against this fork's certificate).
+  Its internal Debian version is still `1.03.01-0`, so `dpkg -i` replaces the installed one in place;
+  keep `apt-mark hold termux-x11-nightly` set so `pkg upgrade` cannot swap in upstream's loader, which
+  refuses this app's signature.
+
+### Upstream since `53f84373` (12 commits)
+
+- **X server — Present:** the wait-fence callback now disarms itself before calling `re_execute()`,
+  so `miSyncTriggerFence()`'s restart-scan can no longer fire the same trigger over and over
+  (`cpp/patches/xserver.patch`); `InitOutput.c` compares the Present pixmap's height with the screen
+  *height* — it had been comparing it with the width.
+- **X server — clipboard hardening** (`clipboard.c`, `activity.cpp`, six commits): UTF-8 validation
+  made strict per RFC 3629, with the continuation-byte reads bounds-checked (a truncated sequence
+  could read past the end of the X property buffer); standalone carriage returns preserved as line
+  feeds; requests from clients that have since disconnected discarded; text buffers moved from the
+  stack to the heap; and the Android side reads exactly `count` bytes of a clipboard payload instead
+  of `count + 1`, which had stolen the first byte of the next protocol message off the socket.
+- **`termux-x11` connection knock** (`cmdentrypoint.cpp`): the listener waits at most 200 ms for a
+  client's knock (`poll` + non-blocking `recv`), so a stalled client can no longer hang it.
+- **Preferences plumbing:** a new `TermuxX11Application` owns the built-in and secondary-display
+  `Prefs` and attaches them once at process start (with a `createPackageContext` detour for
+  `sharedUid` builds, where a platform-supplied context can identify as the host package);
+  `MainActivity.prefs` became an instance field, the static `getPrefs()` is gone, `Prefs` gained a
+  no-arg constructor plus `attach()`, and `LoriePreferences`, `LorieView`, `TouchInputHandler`,
+  `KeyInterceptor` and the extra-keys code all read through the singleton. The fork's Export / Import
+  dumps and merges the same two SharedPreferences files as before, and its post-import
+  `ACTION_PREFERENCES_CHANGED` still makes an open window re-read them.
+- **`sharedUid` flavour:** the `KeyInterceptor` accessibility service is now pinned to
+  `android:process="com.termux"` like every other component — it had been landing in its own default
+  process. Directly relevant here, since this fork ships only that flavour.
+- **Dependencies:** `kotlin-stdlib-jdk8` 2.4.10 → 2.4.20.
+
+### Build pipeline
+
+- Nothing changed in `lorie-app/shiroikuma.gradle`; the version pin moved by itself with the rebase.
+- Recorded for the next sync: upstream applies `cpp/patches/*.patch` **in place** into the submodule
+  working trees at CMake configure time with `patch -N`, which cannot upgrade a tree that already
+  carries the previous version of a patch — GNU `patch` sees the later hunks as "previously applied"
+  and skips the whole file, the new hunk included. After a sync that changes a patch, the submodule
+  trees must be reset to their gitlinks (`git submodule foreach 'git checkout -- .'`) and
+  `lorie/.cxx` removed before building. `+004` was built that way; `+003`, built before the reset,
+  lacked the Present wait-fence fix and was set aside.
+
+---
+
 ## 白い熊 Termux X11 `1.03.01+2026-09-10.23-47.g53f84373+002` — 2026-09-13
 
 **First public release.** Built on upstream `termux/termux-x11`, branch `master`, commit
