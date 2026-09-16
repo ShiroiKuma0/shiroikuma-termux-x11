@@ -17,6 +17,53 @@ tip, not tags (Termux:X11 has no releases), and the version string pins that com
 
 ---
 
+## 白い熊 Termux X11 `1.03.01+2026-09-16.05-25.ga7ae7819+005` — 2026-09-16
+
+**Upstream sync.** Built on upstream `termux/termux-x11`, branch `master`, commit
+[`a7ae7819`](https://github.com/termux/termux-x11/commit/a7ae7819) (2026-09-16 05:25 UTC — *fix(InputEventSender.java): track touch IDs and send historical coordinates*), upstream version literal `1.03.01`, `versionCode 15` — both unchanged, so the build counter simply continues (`versionCode 150005`). The fork's six commits were rebased onto the three new upstream commits without a conflict: upstream touched only `activity.cpp`, `LorieView.java` and `InputEventSender.java`, none of which this fork patches, so the file sets did not intersect at all. No submodule gitlink moved, and **no fork feature changed** in this release — it exists to carry upstream's input fixes below.
+
+### The two artefacts
+
+- **`shiroikuma-termux-x11_1.03.01+2026-09-16.05-25.ga7ae7819+005_sharedUid.apk`** — the signed
+  release build of the `sharedUid` flavour, one universal APK for all four ABIs, `versionCode 150005`;
+  installs over `+004` in place.
+- **`shiroikuma-termux-x11_1.03.01+2026-09-16.05-25.ga7ae7819+005_termux-x11-nightly.deb`** — the
+  companion package (the `termux-x11` command and its loader, built against this fork's certificate).
+  Its internal Debian version is still `1.03.01-0`, so `dpkg -i` replaces the installed one in place;
+  keep `apt-mark hold termux-x11-nightly` set so `pkg upgrade` cannot swap in upstream's loader, which
+  refuses this app's signature.
+
+### Upstream since `9df6ca26` (3 commits)
+
+All three are fixes by the upstream maintainer, landed the same morning; the batch is entirely
+input- and connection-side, with nothing touching the build, the packaging or the X.Org submodules.
+
+- **Touch input — full-resolution drags** (`InputEventSender.java`): an `ACTION_MOVE` now replays
+  every *historical* coordinate sample Android batched into the `MotionEvent` before sending the
+  current one, instead of sending only the latest point — so a drag or a stroke reaches the X client
+  at the digitiser's sampling rate rather than at the frame rate. Alongside it, the stuck-pointer
+  workaround was rewritten: the pointer table grew from 10 slots to 32, and a new
+  `releaseMissingPointers()` ends only the touch IDs that have genuinely disappeared from the event,
+  where the old code blindly sent `XI_TouchEnd` to all ten slots on *every* move. `ACTION_CANCEL`
+  now releases every pointer and returns, and `pointers[id]` is kept in step on touch down and up.
+- **X server — disconnect ordering** (`cpp/lorie/activity.cpp`): when the X client's socket reports
+  error or hang-up, the Java callback `clientConnectedStateChanged` is fired *after* the fd is
+  removed from the looper, the connection closed and the renderer's shared state and buffers
+  cleared, rather than before — so the Java side no longer observes a half-torn-down connection as
+  still live.
+- **IME text — surrogate pairs preserved** (`LorieView.java`): appending composing text sends the
+  whole newly-added substring as one UTF-8 event instead of one `char` at a time, which had split
+  every surrogate pair — emoji and the rarer CJK planes — into two lone halves that are not valid
+  UTF-8 on their own.
+
+### Build pipeline
+
+- Nothing changed in `lorie-app/shiroikuma.gradle`; the version pin moved by itself with the rebase.
+- No `cpp/patches/*.patch` changed in this sync, so the submodule-reset dance recorded under `+004`
+  was not needed: only upstream's own `cpp/lorie/activity.cpp` recompiled, across the four ABIs.
+
+---
+
 ## 白い熊 Termux X11 `1.03.01+2026-09-15.13-25.g9df6ca26+004` — 2026-09-15
 
 **Upstream sync.** Built on upstream `termux/termux-x11`, branch `master`, commit
