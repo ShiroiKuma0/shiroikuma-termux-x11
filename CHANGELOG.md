@@ -17,6 +17,123 @@ tip, not tags (Termux:X11 has no releases), and the version string pins that com
 
 ---
 
+## 白い熊 Termux X11 `1.03.01+2026-09-25.09-49.g9c23bd3b+006` — 2026-09-26
+
+**Upstream sync.** Built on upstream `termux/termux-x11`, branch `master`, commit [`9c23bd3b`](https://github.com/termux/termux-x11/commit/9c23bd3b) (2026-09-25 09:49 UTC — *fix(LorieApp.java): avoid duplicate linkToDeath registrations*), upstream version literal `1.03.01`, `versionCode 15` — both unchanged, so the build counter simply continues (`versionCode 150006`). Twenty-five new upstream commits, and for the first time since the fork began they **restructured a file this fork patches**: the notification and the broadcast receiver were moved out of `MainActivity` into the `Application` class, which was then renamed `LorieApp`. The fork's eight commits rebased with exactly one conflict, resolved by porting our change to its new home rather than by re-applying the old diff — see below. No submodule gitlink moved and no `cpp/patches/*.patch` changed, so only upstream's own `cpp/lorie/` sources recompiled.
+
+### The fork's own layer
+
+Two source lines of ours moved or appeared; no fork feature changed behaviour.
+
+- **The notification title followed upstream's refactor.** Our one-line change — the ongoing
+  notification titled from `R.string.lorie_app_name` (the `TERMUX_X11_APP_NAME` entity) instead of
+  the literal `"Termux:X11"` — lived in `MainActivity.buildNotification()`, which upstream deleted
+  outright when it moved the whole notification into the `Application` class. The conflict was
+  resolved by taking upstream's deletion in full (`MainActivity.java` is now byte-identical to
+  upstream in that region) and re-applying the change at its new site: the cached base notification
+  built once in `LorieApp.onCreate()`. The notification channel's id and name were already read from
+  the same string resource by upstream's own code, so the channel needed nothing.
+- **A new de-branding site, created by upstream's new feature.** `407fa3b` added a fatal error for a
+  second X server trying to take over an active connection, with the message hard-coded as
+  *"Termux:X11 already has an active X server connection."* — the first user-visible brand string
+  upstream has added since the fork's Phase 3. It now reads the app name from
+  `R.string.lorie_app_name` too, so the entity stays the single source of brand truth for every
+  string the user can see.
+- **Both manifests re-anchored** onto the renamed `.LorieApp$Receiver` — the receiver entry our
+  automation block sits after in `lorie/src/main/AndroidManifest.xml`, and the line directly above
+  our four `android:process="com.termux"` entries in the `sharedUid` overlay. Our
+  `ACTION_PREFERENCES_CHANGED` broadcast is addressed by action, never by class, so it was
+  unaffected by the rename.
+- **The agent documentation followed the rename** — the three `CLAUDE.md` rows that named
+  `LorieBroadcastReceiver` or `TermuxX11Application` now name `LorieApp` and `LorieApp$Receiver`.
+- Upstream's `styles.xml` change (below) makes the main activity's theme non-DayNight — which is
+  what this fork's own `ShiroikumaUiTheme` has always been, so the UI page and the X window now
+  agree on their base theme by construction rather than by coincidence.
+
+### The two artefacts
+
+- **`shiroikuma-termux-x11_1.03.01+2026-09-25.09-49.g9c23bd3b+006_sharedUid.apk`** — the signed
+  release build of the `sharedUid` flavour, one universal APK for all four ABIs, `versionCode 150006`;
+  installs over `+005` in place.
+- **`shiroikuma-termux-x11_1.03.01+2026-09-25.09-49.g9c23bd3b+006_termux-x11-nightly.deb`** — the
+  companion package (the `termux-x11` command and its loader, built against this fork's certificate).
+  Its internal Debian version is still `1.03.01-0`, so `dpkg -i` replaces the installed one in place;
+  keep `apt-mark hold termux-x11-nightly` set so `pkg upgrade` cannot swap in upstream's loader, which
+  refuses this app's signature.
+
+### Upstream since `a7ae7819` (25 commits)
+
+The largest batch the fork has carried so far, and the only one to touch the app's own structure.
+Nothing in it touches the build, the packaging or the sixteen X.Org submodules.
+
+- **The `Application` class absorbed the notification and the broadcast receiver** (nine commits,
+  `1df1205` → `05d98fe`). `LorieBroadcastReceiver` first grew into the single dispatcher for every
+  broadcast action, caching a pending connection binder so an `ACTION_START` arriving before any
+  activity exists is picked up on `MainActivity`'s first connect attempt instead of being lost, with
+  one death recipient clearing the cache and disconnecting the live service. It was then folded into
+  the `Application` as a nested `Receiver` — the state it held (`pendingConnection`) belonged there
+  anyway — and the manifest entry re-pointed at it. The notification followed: `buildNotification()`,
+  the channel, posting and cancelling on activity resume/pause, and the refresh after a preference
+  change all moved out of `MainActivity`, with the preference-independent parts of the notification
+  (and its channel) now built **once** in `onCreate()` and each post recovered from that cached
+  `Notification` instead of reconstructing everything and recreating the channel every time. A
+  follow-up (`f4f6fdc`) restores the silent flag by hand, because `NotificationCompat.Builder`'s copy
+  constructor does not carry the group-alert-behavior tweak `setSilent()` relies on — without it the
+  X window's notification would have started making a sound. `TouchInputHandler`'s three notification
+  helpers became static, the `Application` now registers one preference-change listener per prefs
+  store, `MainActivity` holds the `Application` reference in a field instead of casting at every call
+  site, and the class was finally renamed **`LorieApp`** to match `LorieView` / `LoriePreferences`.
+- **A conflicting X server now reports a real fatal error** (`407fa3b`, `bd1cfad`, `9c23bd3`).
+  `ICmdEntryInterface` gained `reportFatalError()`, which queues `FatalError()` onto the X server's
+  own thread so the loser exits through the normal teardown path instead of a raw `exit()`; a second
+  `termux-x11` while one is already connected is told so rather than being silently dropped and left
+  orphaned. Two follow-ups keep it from misfiring: the *same* binder retrying `ACTION_START` is no
+  longer mistaken for a competing server, and `linkToDeath` is no longer registered twice for one
+  connection.
+- **Keyboard input on the X server thread** (`2beefbf`, `f2bd19d`, `c861882`, `fa7a9cb`). Key events
+  are now processed on the server's own thread and `mieq` is drained after physical keys are queued.
+  Two Unicode-keysym fixes go with them: the active keyboard is switched *before* keysyms are
+  assigned, and the keycode tracking table keeps one entry per keycode, so a keymap replacement can
+  no longer leave a duplicate at the LRU tail that recycles a key which had just been assigned and
+  used — the cause of characters arriving as the wrong glyph after a soft-keyboard layout change.
+- **Zoom panning is now optional** (`b9b56a7`). A new **“Pan to follow cursor while zoomed in”**
+  preference (`zoomFollowsCursor`, default on) — turn it off and a zoomed view stops chasing the
+  cursor around; the vertical panning that keeps the bottom of the screen clear of the soft keyboard
+  is unaffected either way. Alongside it, the renderer's state-lock setters were deduplicated behind
+  a `withStateLock` macro (`dc61bc7`).
+- **The start screen wears icons, and the theme stopped following the system** (`912b712`,
+  `c74e35e`). Preferences, help and exit are now a settings gear, an info glyph and a logout arrow
+  sitting closer together, their labels shortened to `Preferences` / `Help` / `Exit`; `LorieAppTheme`
+  extends the non-DayNight AppCompat base, so the activity no longer renders light-theme chrome over
+  the hard-coded black background of `main_activity.xml`.
+- **The mouse and stylus overlay behaves around the IME and the extra-keys bar** (`6e4158f`,
+  `fb282e0`, `f5f05b3`). The overlay's visible rect is clamped against the IME height
+  unconditionally and against the bar's thickness only when the bar is not already reserving its own
+  space; the IME content inset is derived from the bar's own bottom margin in that case instead of
+  being independently reseeded. The bar is kept fully opaque whenever it reserves space, since a
+  translucent bar there would show content bleeding through a region meant to be exclusively its
+  own. And the overlay's click and position buttons now treat `ACTION_CANCEL` like `ACTION_UP`, so a
+  gesture the system intercepts — a back-navigation swipe starting on a button — can no longer leave
+  it stuck down with its mouse button held.
+- **One preference stopped being per-display** (`77b661b`). `enableAccessibilityServiceAutomatically`
+  now always reads and writes the built-in store, like `storeSecondaryDisplayPreferencesSeparately`
+  already did, instead of whichever store the current display happens to use.
+- **Docs** (`051f2e1`): the README's kill recipe is `pkill -f termux-x11`, since the bare form does
+  not match the full process name.
+
+### Build pipeline
+
+- Nothing changed in `lorie-app/shiroikuma.gradle`, `gradle.properties` or any upstream build file;
+  the version pin moved by itself with the rebase. Upstream landed no Gradle, AGP, wrapper or CI
+  commits in this range, so there was no Gradle-side conflict to resolve at all.
+- The native build was incremental: `renderer.cpp`, `cmdentrypoint.cpp` and `InputXKB.c` recompiled
+  and `libXlorie.so` relinked for all four ABIs, the X.Org submodules untouched.
+- The loader's build-time overrides were re-verified after the rebase — `shell-loader/build.gradle`
+  is still upstream's byte for byte, still reads `signingConfigs.debug` for the certificate constant,
+  and its generated `BuildConfig` still carries this fork's name and `/releases` link.
+
+---
+
 ## 白い熊 Termux X11 `1.03.01+2026-09-16.05-25.ga7ae7819+005` — 2026-09-16
 
 **Upstream sync.** Built on upstream `termux/termux-x11`, branch `master`, commit
