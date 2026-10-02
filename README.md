@@ -10,7 +10,7 @@ A fork of [Termux:X11](https://github.com/termux/termux-x11) (`termux/termux-x11
 
 Installs **over** the stock Termux:X11 (app id `com.termux.x11` kept so the Termux package ecosystem keeps working); the whole family — Termux, Termux API, Termux X11, Termux GUI and 白い熊 GNU Emacs — shares Android UID `com.termux` and is signed with one key, so every member must come from these forks.
 
-**📥 Latest release: [`1.03.01+2026-09-25.09-49.g9c23bd3b+006`](https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases/latest)** — [all releases & downloads »](https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases) · [changelog »](CHANGELOG.md)
+**📥 Latest release: [`1.03.01+2026-10-01.03-18.g0e1ebb4c+007`](https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases/latest)** — [all releases & downloads »](https://github.com/ShiroiKuma0/shiroikuma-termux-x11/releases) · [changelog »](CHANGELOG.md)
 
 </div>
 
@@ -73,7 +73,7 @@ Five apps share Android UID `com.termux` — [shiroikuma-termux](https://github.
 ## 🔢 A version that names the upstream commit
 
 Termux:X11 has no releases — its `nightly` tag moves with every `master` commit while the literal `1.03.01` stands still for months. This fork rebases `custom` onto every upstream commit and pins the base in the version:
-`<upstream version>+<upstream base date>.<HH-MM>.g<sha8>+<NNN>`, e.g. `1.03.01+2026-09-25.09-49.g9c23bd3b+006` — upstream `9c23bd3b` committed 2026-09-25 09:49 UTC, our sixth build overall, the first on that base. `versionCode` = upstream code × 10000 + N, and the build counter runs monotonically across syncs so an update is never a downgrade.
+`<upstream version>+<upstream base date>.<HH-MM>.g<sha8>+<NNN>`, e.g. `1.03.01+2026-10-01.03-18.g0e1ebb4c+007` — upstream `0e1ebb4c` committed 2026-10-01 03:18 UTC, our seventh build overall, the first on that base. `versionCode` = upstream code × 10000 + N, and the build counter runs monotonically across syncs so an update is never a downgrade.
 
 ---
 

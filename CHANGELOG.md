@@ -17,6 +17,68 @@ tip, not tags (Termux:X11 has no releases), and the version string pins that com
 
 ---
 
+## 白い熊 Termux X11 `1.03.01+2026-10-01.03-18.g0e1ebb4c+007` — 2026-10-02
+
+**Upstream sync.** Built on upstream `termux/termux-x11`, branch `master`, commit [`0e1ebb4c`](https://github.com/termux/termux-x11/commit/0e1ebb4c) (2026-10-01 03:18 UTC — *build(deps): bump gradle/actions from 6.3.0 to 6.4.0*), upstream version literal `1.03.01`, `versionCode 15` — both unchanged, so the build counter simply continues (`versionCode 150007`). Eight new upstream commits; one of them touches `TermuxX11ExtraKeys.java`, the file that carries this fork's long-press hook, but in separate hunks — the fork's eleven commits rebased with **no conflict**. No submodule gitlink moved and no `cpp/patches/*.patch` changed.
+
+### The fork's own layer
+
+No fork source changed in this release; every customization was re-verified after the rebase.
+
+- **The gear key's long press keeps working at the gear's new place.** Upstream's new default
+  extra-keys layout moves PREFERENCES from the top-right corner to the bottom-right one. The fork's
+  `onExtraKeyButtonLongClick` hook matches the key by name, not by position, so a long press on the
+  gear still opens the **白い熊 Termux X11 UI** page wherever the gear sits. In the new default the
+  gear is a plain key with no swipe-up popup (ZOOM_RESET moved to the KEYBOARD key with it), so the
+  long press no longer shares the key with a popup gesture. A layout you have customized yourself is
+  untouched — only the default moved.
+
+### The two artefacts
+
+- **`shiroikuma-termux-x11_1.03.01+2026-10-01.03-18.g0e1ebb4c+007_sharedUid.apk`** — the signed
+  release build of the `sharedUid` flavour, one universal APK for all four ABIs, `versionCode 150007`;
+  installs over `+006` in place.
+- **`shiroikuma-termux-x11_1.03.01+2026-10-01.03-18.g0e1ebb4c+007_termux-x11-nightly.deb`** — the
+  companion package (the `termux-x11` command and its loader, built against this fork's certificate).
+  Its internal Debian version is still `1.03.01-0`, so `dpkg -i` replaces the installed one in place;
+  keep `apt-mark hold termux-x11-nightly` set so `pkg upgrade` cannot swap in upstream's loader, which
+  refuses this app's signature.
+
+### Upstream since `9c23bd3b` (8 commits)
+
+- **PASTE sends the clipboard as UTF-8 text** (`deb245e`). The PASTE extra key used to push the
+  clipboard through Android's virtual-keyboard `KeyCharacterMap`, turning it into synthetic key
+  events — anything that map has no key for (Japanese, most non-Latin text, many symbols) was
+  silently dropped. It now hands the string to `LorieView.sendTextEvent()` as UTF-8 bytes, the same
+  path the soft keyboard's committed text takes, so pasting any text into an X application arrives
+  intact. The text field of the toolbar's second page now calls `sendTextEvent()` directly too,
+  instead of wrapping its text in a multi-character `KeyEvent` that ended up there anyway.
+- **Menu and Break keys work inside X** (`f782b59`). Android's `KEYCODE_MENU` was mapped to
+  `KEY_CONTEXT_MENU` and `KEYCODE_BREAK` to `KEY_BREAK`, both beyond X11's 255-keycode limit, so the
+  keys did nothing. They now map to `KEY_COMPOSE` (the Menu key of a PC keyboard) and `KEY_PAUSE`.
+- **New default extra-keys layout** (`29f57c0`): KEYBOARD and PREFERENCES swap places — the keyboard
+  toggle (with ZOOM_RESET as its swipe-up popup) takes the top-right corner, the gear the
+  bottom-right one. See above for the gear's long press.
+- **Stroked vector icons** (`483fbc7`) for the keyboard, zoom in / out / reset and exit glyphs,
+  matching the start screen's icons of the previous sync.
+- **The renderer thread is named for the JVM** (`99a33ac`): it attaches as `LorieRendererThread`
+  through `AttachCurrentThread`'s arguments instead of renaming itself afterwards with
+  `pthread_setname_np`, so Java-side thread dumps no longer show it as `Thread-N`.
+- **Dependencies** (Dependabot): Gradle wrapper 9.7.1 → 9.8.0, `androidx.annotation` 1.10.0 → 1.11.0
+  (the shell-loader stub), `gradle/actions` 6.3.0 → 6.4.0 (CI only).
+
+### Build pipeline
+
+- The Gradle 9.8.0 wrapper builds this fork unchanged: `lorie-app/shiroikuma.gradle`,
+  `gradle.properties` and every upstream build file needed nothing, and the version pin moved by
+  itself with the rebase.
+- The native build was incremental: `lorie.h`'s keycode table and `renderer.cpp` recompiled and
+  `libXlorie.so` relinked for all four ABIs, the X.Org submodules untouched.
+- The loader's build-time overrides were re-verified — `shell-loader/build.gradle` is still
+  upstream's byte for byte and still reads `signingConfigs.debug` for the certificate constant.
+
+---
+
 ## 白い熊 Termux X11 `1.03.01+2026-09-25.09-49.g9c23bd3b+006` — 2026-09-26
 
 **Upstream sync.** Built on upstream `termux/termux-x11`, branch `master`, commit [`9c23bd3b`](https://github.com/termux/termux-x11/commit/9c23bd3b) (2026-09-25 09:49 UTC — *fix(LorieApp.java): avoid duplicate linkToDeath registrations*), upstream version literal `1.03.01`, `versionCode 15` — both unchanged, so the build counter simply continues (`versionCode 150006`). Twenty-five new upstream commits, and for the first time since the fork began they **restructured a file this fork patches**: the notification and the broadcast receiver were moved out of `MainActivity` into the `Application` class, which was then renamed `LorieApp`. The fork's eight commits rebased with exactly one conflict, resolved by porting our change to its new home rather than by re-applying the old diff — see below. No submodule gitlink moved and no `cpp/patches/*.patch` changed, so only upstream's own `cpp/lorie/` sources recompiled.
